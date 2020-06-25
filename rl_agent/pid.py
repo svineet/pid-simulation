@@ -162,7 +162,7 @@ class PIDModel:
         """
             Restart the episode, clear all data
         """
-        self.model.__init__((0,0,0))
+        self.model.__init__((0, 0, 0))
         self.pid.__init__(dt=self.t[1]-self.t[0], initial_error=0, set_point=self.setpoint[0])
         self.__init__(self.ku, self.tu, self.t, self.setpoint)
         
@@ -171,3 +171,16 @@ class PIDModel:
             Returns array of [y1, y2, y3] where y1 is plants output       
         """
         return self.model.y_caps
+
+
+if __name__ == "__main__":
+    env = PIDModel(1, 1, t=np.linspace(0, 100, num=1000), SP=np.ones(1000)*200)
+
+    action = (0.5, 0.5, 3)
+    for i in range(1000):
+        new_state, reward, done = env.step(action)
+        print(new_state, reward)
+
+        if done: break
+
+

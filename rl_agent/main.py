@@ -10,7 +10,7 @@ from agent import Agent, Actor, Critic
 
 
 def train(args):
-    env = PIDEnvironment()
+    env = PIDModel(1, 1, t=np.linspace(0, 200, num=2000), SP=np.ones(2000)*200)
 
     actor = Actor()
     critic = Critic()
@@ -28,12 +28,13 @@ def train(args):
         done = False
         total = 0
 
-        # TODO: Handle initial 5 timestep issue of not having
-        # complete state
-
         agent.start_episode()
+        state = env.step((0.5, 0.5, 3.5))
         while not done:
-            action = agent.get_action(state)
+            # action = agent.get_action(state)
+            # TODO: Implement gaussian exploration
+            action = (0.5, 0.5, 3)
+
             new_state, reward, done = env.step(action)
             total += reward
             state = new_state

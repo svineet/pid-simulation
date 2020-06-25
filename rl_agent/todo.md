@@ -27,3 +27,13 @@ Where action is `(Kd', Kp', alpha)`
 equations in the fuzzy logic paper
 
 
+Small things
+============
+
+- Reward function check
+- Check update equations
+- Hyperparameters involved: gamma
+
+
+
+
