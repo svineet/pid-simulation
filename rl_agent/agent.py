@@ -30,7 +30,7 @@ def Critic:
     def forward(self, state):
         pass
 
-    def train(self, ):
+    def train(self):
         pass
 
 
