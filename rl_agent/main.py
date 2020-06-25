@@ -28,6 +28,9 @@ def train(args):
         done = False
         total = 0
 
+        # TODO: Handle initial 5 timestep issue of not having
+        # complete state
+
         agent.start_episode()
         while not done:
             action = agent.get_action(state)
