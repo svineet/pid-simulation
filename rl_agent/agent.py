@@ -56,7 +56,7 @@ class Agent:
         self.critic_model = critic_model
 
         self.gamma = gamma
-        self.optimiser = torch.optim.RMSProp(
+        self.optimiser = torch.optim.RMSprop(
             list(self.actor_model.parameters())+list(self.critic_model.parameters()),
             lr=lr)
 
