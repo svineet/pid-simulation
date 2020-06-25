@@ -3,24 +3,33 @@ import pandas as pd
 
 from collections import deque
 
-# Imports as required
+import torch
+from torch import nn
+from torch.nn import functional as F
 
 
-def Actor:
-    """
-        Neural net that returns
-    """
-    def __init__(self):
-        pass
+def Actor(nn.Module):
+    def __init__(self, h1=100, h2=100, num_actions=3):
+        super().__init__()
+
+        self.fc1 = nn.Linear(state_size, h1)
+        self.fc2 = nn.Linear(h1, h2)
+        self.fc3 = nn.Linear(h2, num_actions)
 
     def forward(self, state):
+        out = F.relu(self.fc1(state))
+        out = F.relu(self.fc2(out))
+        out = F.sigmoid(self.fc3(out))
+
+        print(out.shape)
+
+        return out
+
+    def train(self):
         pass
 
-    def train(self, state, target_action):
-        pass
 
-
-def Critic:
+def Critic(nn.Module):
     """
         Neural net that returns Value function of a state
     """
@@ -41,6 +50,9 @@ class Agent:
         self.critic_model = critic_model
 
         self.gamma = gamma
+        self.optimiser = torch.optim.RMSProp(
+            list(self.actor_model.parameters())+list(self.critic_model.parameters()),
+            lr=lr)
 
     def get_action(self, state):
         """
@@ -75,4 +87,9 @@ class Agent:
             stored by Agent itself.
         """
         pass
+
+
+if __name__=='__main__':
+    actor = Actor()
+    actor.forward()
 
