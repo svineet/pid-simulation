@@ -25,6 +25,7 @@ def train(args):
     stats = {
         "reward_ema": deque([])
     }
+    torch.autograd.set_detect_anomaly(True)
 
     for i in range(args["NUM_EPISODES"]):
         print("Starting episode", i)
@@ -38,6 +39,7 @@ def train(args):
         while not done:
             print("Step", num_step, "for episode", i)
             action = agent.get_action(state)
+
             # Exploration strategy
             gauss_noise = np.random.normal(0, 0.01, size=3)
             target_action = action+torch.Tensor(gauss_noise)
@@ -66,8 +68,7 @@ if __name__ == '__main__':
     stats = train({
         "NUM_EPISODES": 1000,
         "LEARNING_RATE": 0.001,
-        "DEVICE": "cpu",
-        "RENDER_ENV": False
+        "DEVICE": "cpu"
     })
 
     plt.plot(stats["reward_ema"])

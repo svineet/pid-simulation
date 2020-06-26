@@ -13,22 +13,18 @@ class Actor(nn.Module):
         super().__init__()
 
         self.fc1 = nn.Linear(state_size, h1)
-        self.fc2 = nn.Linear(h1, h2)
-        self.fc3 = nn.Linear(h2, num_actions)
+        self.fc2 = nn.Linear(h1, num_actions)
+        self.sig = nn.Sigmoid()
 
-        self.fc1.weight.data.fill_(2)
+        self.fc1.weight.data.fill_(0.5)
         self.fc1.bias.data.fill_(0.05)
 
-        self.fc2.weight.data.fill_(2)
+        self.fc2.weight.data.fill_(0.5)
         self.fc2.bias.data.fill_(0.05)
-
-        self.fc3.weight.data.fill_(2)
-        self.fc3.bias.data.fill_(0.05)
 
     def forward(self, state):
         out = F.relu(self.fc1(state))
-        out = F.relu(self.fc2(out))
-        out = torch.sigmoid(self.fc3(out))
+        out = self.sig(self.fc2(out))
 
         return out
 
@@ -63,12 +59,8 @@ class Agent:
         self.device = device
 
         # Train pure SGD
-        self.actor_optimizer = torch.optim.SGD(
-            list(self.actor_model.parameters())+list(self.critic_model.parameters()),
-            lr=lr, momentum=0)
-        self.critic_optimizer = torch.optim.SGD(
-            list(self.actor_model.parameters())+list(self.critic_model.parameters()),
-            lr=lr, momentum=0)
+        self.actor_optimizer = torch.optim.SGD(list(self.actor_model.parameters()), lr=lr, momentum=0)
+        self.critic_optimizer = torch.optim.SGD(list(self.critic_model.parameters()), lr=lr, momentum=0)
 
     def get_action(self, state):
         """
@@ -123,7 +115,7 @@ class Agent:
         # Value of the last state = R_t
         state_values = deque([])
         critic_loss = deque([])
-        del_ts = deque([rewards[-1]-self.critic_model(torch.Tensor(states[-1]))])
+        del_ts = deque([(rewards[-1]-self.critic_model(torch.Tensor(states[-1]))).detach().numpy()[0]])
 
         for reward, cur_state, next_state in zip(reversed(rewards[:-1]), reversed(states[:-1]), reversed(states[1:])):
             next_value = self.critic_model(torch.Tensor(next_state))
@@ -139,15 +131,18 @@ class Agent:
             (cur_value*del_t_num).backward()
             self.critic_optimizer.step()
 
+        k = 0
         for del_t, a_t, ac_t in zip(reversed(del_ts), reversed(self.actions), reversed(self.sug_actions)):
+            k+=1
             if del_t > 0:
                 self.actor_optimizer.zero_grad()
 
                 # Actor loss
-                action_advantage = torch.Tensor((a_t - ac_t).detach().numpy())
-                (action_advantage*ac_t).sum().backward()
+                with torch.no_grad():
+                    action_advantage = torch.Tensor((a_t - ac_t).detach().numpy())
 
-                self.actor_optimizer.step()
+                (action_advantage*ac_t).sum().backward()
+        self.actor_optimizer.step()
 
     def load(self, actor_file, critic_file):
         pass
