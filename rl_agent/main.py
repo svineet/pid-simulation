@@ -1,6 +1,8 @@
 import numpy as np
 import pandas as pd
 
+import torch
+
 from matplotlib import pyplot as plt
 
 from collections import deque
@@ -10,7 +12,9 @@ from agent import Agent, Actor, Critic
 
 
 def train(args):
-    env = PIDModel(1, 1, t=np.linspace(0, 200, num=2000), SP=np.ones(2000)*200)
+    T_SIZE = 100
+    SET_POINT = 50
+    env = PIDModel(1, 1, t=np.linspace(0, 100, num=T_SIZE), SP=np.ones(T_SIZE)*SET_POINT)
 
     actor = Actor()
     critic = Critic()
@@ -29,21 +33,29 @@ def train(args):
         total = 0
 
         agent.start_episode()
-        state = env.step((0.5, 0.5, 3.5))
+        state, _, __ = env.step((0.5, 0.5, 3.5))  # Initial random state
+        num_step = 1
         while not done:
-            # action = agent.get_action(state)
-            # TODO: Implement gaussian exploration
-            action = (0.5, 0.5, 3)
+            print("Step", num_step, "for episode", i)
+            action = agent.get_action(state)
+            # Exploration strategy
+            gauss_noise = np.random.normal(0, 0.01, size=3)
+            target_action = action+torch.Tensor(gauss_noise)
+            print(action, target_action)
 
-            new_state, reward, done = env.step(action)
+            new_state, reward, done = env.step(target_action)
+            agent.step(state, target_action, action, reward)
+
             total += reward
             state = new_state
+            num_step += 1
 
         # Learn from this episode
         agent.learn()
 
         ema_reward = 0.9*ema_reward + 0.1*total
         if i%10==0:
+            agent.save()
             stats["reward_ema"].append(ema_reward)
             print("EMA of Reward is", ema_reward)
 
@@ -52,7 +64,7 @@ def train(args):
 
 if __name__ == '__main__':
     stats = train({
-        "NUM_EPISODES": 2000,
+        "NUM_EPISODES": 1000,
         "LEARNING_RATE": 0.001,
         "DEVICE": "cpu",
         "RENDER_ENV": False

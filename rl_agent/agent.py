@@ -16,15 +16,21 @@ class Actor(nn.Module):
         self.fc2 = nn.Linear(h1, h2)
         self.fc3 = nn.Linear(h2, num_actions)
 
+        self.fc1.weight.data.fill_(2)
+        self.fc1.bias.data.fill_(0.05)
+
+        self.fc2.weight.data.fill_(2)
+        self.fc2.bias.data.fill_(0.05)
+
+        self.fc3.weight.data.fill_(2)
+        self.fc3.bias.data.fill_(0.05)
+
     def forward(self, state):
         out = F.relu(self.fc1(state))
         out = F.relu(self.fc2(out))
         out = torch.sigmoid(self.fc3(out))
 
         return out
-
-    def train(self):
-        pass
 
 
 class Critic(nn.Module):
@@ -45,20 +51,24 @@ class Critic(nn.Module):
 
         return out
 
-    def train(self):
-        pass
-
 
 class Agent:
     def __init__(self, environment, actor_model, critic_model,
-                 lr=0.001, gamma=0.99, device="cpu"):
+                 lr=0.01, gamma=0.9, device="cpu"):
         self.actor_model = actor_model
         self.critic_model = critic_model
 
+        self.lr = lr
         self.gamma = gamma
-        self.optimiser = torch.optim.RMSprop(
+        self.device = device
+
+        # Train pure SGD
+        self.actor_optimizer = torch.optim.SGD(
             list(self.actor_model.parameters())+list(self.critic_model.parameters()),
-            lr=lr)
+            lr=lr, momentum=0)
+        self.critic_optimizer = torch.optim.SGD(
+            list(self.actor_model.parameters())+list(self.critic_model.parameters()),
+            lr=lr, momentum=0)
 
     def get_action(self, state):
         """
@@ -66,19 +76,21 @@ class Agent:
 
             Use gaussian exploration strategy outlined in the paper
         """
-        pass
+        output = self.actor_model(torch.Tensor(list(state)))
+
+        return output
 
     def start_episode(self):
-        """
-            Clear all last episode data and start afresh for this episode
-        """
-        pass
+        self.states = deque([])
+        self.rewards = deque([])
+        self.actions = deque([])
+        self.sug_actions = deque([])
 
-    def step(self, state, action, reward, next_state):
-        """
-            Store data for later training 
-        """
-        pass
+    def step(self, state, action, suggested_action, reward):
+        self.states.append(state)
+        self.rewards.append(reward)
+        self.actions.append(action)
+        self.sug_actions.append(suggested_action)
 
     def learn(self):
         """
@@ -92,7 +104,50 @@ class Agent:
             Episode chain is a list of (state, action, next_state, reward) tuples
             stored by Agent itself.
         """
-        pass
+        cum_rew = 0
+        full_rew = 0
+        rewards = np.array(self.rewards)
+        discounted_rewards = deque([])
+        for reward in reversed(rewards):
+            full_rew += reward
+            cum_rew = reward + self.gamma*cum_rew
+            discounted_rewards.appendleft(cum_rew)
+
+        device = self.device
+        discounted_rewards = torch.Tensor(discounted_rewards).to(device=device)
+
+
+        # Calculate real Monte Carlo value function for each state now
+        states = list(self.states)
+
+        # Value of the last state = R_t
+        state_values = deque([])
+        critic_loss = deque([])
+        del_ts = deque([rewards[-1]-self.critic_model(torch.Tensor(states[-1]))])
+
+        for reward, cur_state, next_state in zip(reversed(rewards[:-1]), reversed(states[:-1]), reversed(states[1:])):
+            next_value = self.critic_model(torch.Tensor(next_state))
+            cur_value = self.critic_model(torch.Tensor(cur_state))
+            delta_t = reward + self.gamma*next_value - cur_value
+
+            del_t_num = float(delta_t.detach().numpy())
+            del_ts.appendleft(del_t_num)
+            state_values.appendleft(cur_value)
+
+            self.critic_optimizer.zero_grad()
+            # Critic loss
+            (cur_value*del_t_num).backward()
+            self.critic_optimizer.step()
+
+        for del_t, a_t, ac_t in zip(reversed(del_ts), reversed(self.actions), reversed(self.sug_actions)):
+            if del_t > 0:
+                self.actor_optimizer.zero_grad()
+
+                # Actor loss
+                action_advantage = torch.Tensor((a_t - ac_t).detach().numpy())
+                (action_advantage*ac_t).sum().backward()
+
+                self.actor_optimizer.step()
 
 
 if __name__=='__main__':
