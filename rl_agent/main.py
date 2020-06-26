@@ -26,6 +26,7 @@ def train(args):
         "reward_ema": deque([])
     }
     torch.autograd.set_detect_anomaly(True)
+    agent.load()
 
     for i in range(args["NUM_EPISODES"]):
         print("Starting episode", i)
@@ -43,7 +44,6 @@ def train(args):
             # Exploration strategy
             gauss_noise = np.random.normal(0, 0.01, size=3)
             target_action = action+torch.Tensor(gauss_noise)
-            print(action, target_action)
 
             new_state, reward, done = env.step(target_action)
             agent.step(state, target_action, action, reward)
@@ -56,7 +56,7 @@ def train(args):
         agent.learn()
 
         ema_reward = 0.9*ema_reward + 0.1*total
-        if i%10==0:
+        if i%1==0:
             agent.save()
             stats["reward_ema"].append(ema_reward)
             print("EMA of Reward is", ema_reward)

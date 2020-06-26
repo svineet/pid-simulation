@@ -144,11 +144,15 @@ class Agent:
                 (action_advantage*ac_t).sum().backward()
         self.actor_optimizer.step()
 
-    def load(self, actor_file, critic_file):
-        pass
+    def load(self):
+        self.actor_model.load_state_dict(
+                torch.load("actor.pkl", map_location=lambda storage, loc: storage))
+        self.critic_model.load_state_dict(
+                torch.load("critic.pkl", map_location=lambda storage, loc: storage))
 
     def save(self):
-        pass
+        torch.save(self.actor_model.state_dict(), "actor.pkl")
+        torch.save(self.critic_model.state_dict(), "critic.pkl")
 
 
 if __name__=='__main__':
