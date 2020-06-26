@@ -149,6 +149,12 @@ class Agent:
 
                 self.actor_optimizer.step()
 
+    def load(self, actor_file, critic_file):
+        pass
+
+    def save(self):
+        pass
+
 
 if __name__=='__main__':
     actor = Actor()
