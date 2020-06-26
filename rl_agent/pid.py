@@ -1,7 +1,6 @@
 import numpy as np
 from scipy.integrate import odeint
 
-# Imports as required
 
 class PIDController:
     """
@@ -75,9 +74,6 @@ class Model:
 
 class PIDModel:
     """
-        State must be a 5 length list of
-        (Kd', Kp', alpha, e_t, de_t/dt)
-
         Action space is (Kd', Kp', alpha), this class handles all
         the denormalisation
 
@@ -111,7 +107,7 @@ class PIDModel:
         if np.abs(e_t) < epsilon:
             r1 = 0
         else:
-            r1 = epsilon - e_t
+            r1 = epsilon - np.abs(e_t)
         
         if np.abs(e_t) <= np.abs(prev_e_t):
             r2 = 0

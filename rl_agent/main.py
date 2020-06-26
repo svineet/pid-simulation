@@ -42,8 +42,9 @@ def train(args):
             action = agent.get_action(state)
 
             # Exploration strategy
-            gauss_noise = np.random.normal(0, 0.01, size=3)
+            gauss_noise = np.random.normal(0, 0.1, size=3)
             target_action = action+torch.Tensor(gauss_noise)
+            print(action, target_action)
 
             new_state, reward, done = env.step(target_action)
             agent.step(state, target_action, action, reward)
@@ -61,17 +62,18 @@ def train(args):
             stats["reward_ema"].append(ema_reward)
             print("EMA of Reward is", ema_reward)
 
+    y_caps = np.array(env.output())
+    plt.plot(y_caps[:, 0])
+    plt.show()
+
     return stats
 
 
 if __name__ == '__main__':
     stats = train({
-        "NUM_EPISODES": 1000,
+        "NUM_EPISODES": 10,
         "LEARNING_RATE": 0.001,
         "DEVICE": "cpu"
     })
-
-    plt.plot(stats["reward_ema"])
-    plt.show()
 
 
