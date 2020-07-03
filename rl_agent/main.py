@@ -18,7 +18,7 @@ def train(args):
     t = np.linspace(0, 100, num=T_SIZE)
     SP = np.ones(T_SIZE)*SET_POINT
 
-    env = PIDModel(1, 1, t=t, SP=SP)
+    env = PIDModel(ku=1.396, tu=3.28, t=t, SP=SP)
 
     actor = Actor()
     critic = Critic()
@@ -79,11 +79,11 @@ def train(args):
 
 if __name__ == '__main__':
     stats = train({
-        "NUM_EPISODES": 10,
+        "NUM_EPISODES": 100,
         "LEARNING_RATE": 0.01,
         "DEVICE": "cpu",
         "exploration_stddev": 0.2,
-        "LOAD_PREVIOUS": False,
+        "LOAD_PREVIOUS": True,
         "PRINT_EVERY": 50
     })
 
