@@ -7,3 +7,4 @@ venv/
 
 .vscode/
 .ipynb_checkpoints/
+rl_agent/*.pkl

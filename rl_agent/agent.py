@@ -16,17 +16,17 @@ class Actor(nn.Module):
         self.fc2 = nn.Linear(h1, num_actions)
         self.sig = nn.Sigmoid()
 
-        self.fc1.weight.data.fill_(0.5)
+        self.fc1.weight.data.fill_(0.01)
         self.fc1.bias.data.fill_(0.05)
 
-        self.fc2.weight.data.fill_(0.5)
+        self.fc2.weight.data.fill_(0.01)
         self.fc2.bias.data.fill_(0.05)
 
     def forward(self, state):
         out = F.relu(self.fc1(state))
         out = self.sig(self.fc2(out))
 
-        return out
+        return out*torch.Tensor([1, 1, 3]) + torch.Tensor([0, 0, 2])
 
 
 class Critic(nn.Module):
@@ -128,7 +128,7 @@ class Agent:
 
             self.critic_optimizer.zero_grad()
             # Critic loss
-            (cur_value*del_t_num).backward()
+            (-cur_value*del_t_num).backward()
             self.critic_optimizer.step()
 
         k = 0
@@ -141,7 +141,7 @@ class Agent:
                 with torch.no_grad():
                     action_advantage = torch.Tensor((a_t - ac_t).detach().numpy())
 
-                (action_advantage*ac_t).sum().backward()
+                (-action_advantage*ac_t).sum().backward()
         self.actor_optimizer.step()
 
     def load(self):

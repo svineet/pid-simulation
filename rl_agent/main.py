@@ -12,9 +12,13 @@ from agent import Agent, Actor, Critic
 
 
 def train(args):
-    T_SIZE = 100
+    T_SIZE = 500
     SET_POINT = 50
-    env = PIDModel(1, 1, t=np.linspace(0, 100, num=T_SIZE), SP=np.ones(T_SIZE)*SET_POINT)
+
+    t = np.linspace(0, 100, num=T_SIZE)
+    SP = np.ones(T_SIZE)*SET_POINT
+
+    env = PIDModel(1, 1, t=t, SP=SP)
 
     actor = Actor()
     critic = Critic()
@@ -26,7 +30,10 @@ def train(args):
         "reward_ema": deque([])
     }
     torch.autograd.set_detect_anomaly(True)
-    agent.load()
+
+    if args["LOAD_PREVIOUS"]:
+        print("Loading previously trained model")
+        agent.load()
 
     for i in range(args["NUM_EPISODES"]):
         print("Starting episode", i)
@@ -36,15 +43,18 @@ def train(args):
 
         agent.start_episode()
         state, _, __ = env.step((0.5, 0.5, 3.5))  # Initial random state
-        num_step = 1
+        num_step = 0
         while not done:
-            print("Step", num_step, "for episode", i)
             action = agent.get_action(state)
 
             # Exploration strategy
-            gauss_noise = np.random.normal(0, 0.1, size=3)
+            gauss_noise = np.random.normal(0, args["exploration_stddev"], size=3)
             target_action = action+torch.Tensor(gauss_noise)
-            print(action, target_action)
+
+            if (num_step % args["PRINT_EVERY"] == 0):
+                print("\tStep", num_step, "for episode", i)
+                print("\t", action, target_action)
+                print("\tReward accumulated:", total)
 
             new_state, reward, done = env.step(target_action)
             agent.step(state, target_action, action, reward)
@@ -63,17 +73,18 @@ def train(args):
             print("EMA of Reward is", ema_reward)
 
     y_caps = np.array(env.output())
-    plt.plot(y_caps[:, 0])
-    plt.show()
 
-    return stats
+    return y_caps
 
 
 if __name__ == '__main__':
     stats = train({
         "NUM_EPISODES": 10,
-        "LEARNING_RATE": 0.001,
-        "DEVICE": "cpu"
+        "LEARNING_RATE": 0.01,
+        "DEVICE": "cpu",
+        "exploration_stddev": 0.2,
+        "LOAD_PREVIOUS": False,
+        "PRINT_EVERY": 50
     })
 
 
