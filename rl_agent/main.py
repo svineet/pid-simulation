@@ -23,13 +23,12 @@ def train(args):
     actor = Actor()
     critic = Critic()
     agent = Agent(env, lr=args["LEARNING_RATE"], actor_model=actor, critic_model=critic,
-                  device=args["DEVICE"])
+                  device=args["DEVICE"], gamma=args["GAMMA"])
     ema_reward = 0
 
     stats = {
-        "reward_ema": deque([])
+        "episode_reward": deque([])
     }
-    torch.autograd.set_detect_anomaly(True)
 
     if args["LOAD_PREVIOUS"]:
         print("Loading previously trained model")
@@ -66,25 +65,28 @@ def train(args):
         # Learn from this episode
         agent.learn()
 
-        ema_reward = 0.9*ema_reward + 0.1*total
         if i%1==0:
             agent.save()
-            stats["reward_ema"].append(ema_reward)
-            print("EMA of Reward is", ema_reward)
+            stats["episode_reward"].append(total)
+            print("Reward for episode was", total)
 
-    y_caps = np.array(env.output())
 
-    return y_caps
+    return stats
 
 
 if __name__ == '__main__':
+    torch.autograd.set_detect_anomaly(True)
     stats = train({
         "NUM_EPISODES": 100,
-        "LEARNING_RATE": 0.01,
+        "LEARNING_RATE": 0.1,
         "DEVICE": "cpu",
-        "exploration_stddev": 0.2,
+        "exploration_stddev": 0.1,
         "LOAD_PREVIOUS": True,
-        "PRINT_EVERY": 50
+        "PRINT_EVERY": 100,
+        "GAMMA": 0.95
     })
+
+    plt.plot(stats["episode_reward"])
+    plt.show()
 
 

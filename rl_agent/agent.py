@@ -13,27 +13,19 @@ class Actor(nn.Module):
         super().__init__()
 
         self.fc1 = nn.Linear(state_size, h1)
-        self.fc2 = nn.Linear(h1, num_actions)
-        self.sig = nn.Sigmoid()
-
-        self.fc1.weight.data.fill_(0.01)
-        self.fc1.bias.data.fill_(0.05)
-
-        self.fc2.weight.data.fill_(0.01)
-        self.fc2.bias.data.fill_(0.05)
+        self.fc2 = nn.Linear(h1, h2)
+        self.fc3 = nn.Linear(h2, num_actions)
 
     def forward(self, state):
         out = F.relu(self.fc1(state))
-        out = self.sig(self.fc2(out))
+        out = F.relu(self.fc2(out))
+        out = torch.sigmoid(self.fc3(out))
 
         return out*torch.Tensor([1, 1, 3]) + torch.Tensor([0, 0, 2])
 
 
 class Critic(nn.Module):
-    """
-        Neural Networks that returns Value function of a state
-    """
-    def __init__(self, h1=50, h2=50, state_size=5):
+    def __init__(self, h1=20, h2=20, state_size=5):
         super().__init__()
 
         self.fc1 = nn.Linear(state_size, h1)
@@ -59,8 +51,8 @@ class Agent:
         self.device = device
 
         # Train pure SGD
-        self.actor_optimizer = torch.optim.SGD(list(self.actor_model.parameters()), lr=lr, momentum=0)
-        self.critic_optimizer = torch.optim.SGD(list(self.critic_model.parameters()), lr=lr, momentum=0)
+        self.actor_optimizer = torch.optim.SGD(self.actor_model.parameters(), lr=lr)
+        self.critic_optimizer = torch.optim.SGD(self.critic_model.parameters(), lr=lr)
 
     def get_action(self, state):
         """
@@ -91,7 +83,6 @@ class Agent:
             1. TD learning for Value network
             2. Custom update rule from CACLA for del > 0
             del = advantage = (actual value of state - predicted_value)
-            i.e (del > 0) =>
 
             Episode chain is a list of (state, action, next_state, reward) tuples
             stored by Agent itself.
@@ -122,26 +113,29 @@ class Agent:
             cur_value = self.critic_model(torch.Tensor(cur_state))
             delta_t = reward + self.gamma*next_value - cur_value
 
-            del_t_num = float(delta_t.detach().numpy())
-            del_ts.appendleft(del_t_num)
+            del_ts.appendleft(delta_t)
             state_values.appendleft(cur_value)
 
             self.critic_optimizer.zero_grad()
+
             # Critic loss
-            (-cur_value*del_t_num).backward()
+            loss = delta_t**2 # Minimise delta_t**2
+            loss.backward()
+
             self.critic_optimizer.step()
 
         k = 0
+        total_loss = torch.Tensor([0])
         for del_t, a_t, ac_t in zip(reversed(del_ts), reversed(self.actions), reversed(self.sug_actions)):
-            k+=1
+            k += 1
             if del_t > 0:
                 self.actor_optimizer.zero_grad()
 
                 # Actor loss
-                with torch.no_grad():
-                    action_advantage = torch.Tensor((a_t - ac_t).detach().numpy())
+                loss = (a_t - ac_t)**2 # Push towards a_t
+                total_loss += loss.sum()
 
-                (-action_advantage*ac_t).sum().backward()
+        total_loss.backward()
         self.actor_optimizer.step()
 
     def load(self):

@@ -103,16 +103,16 @@ class PIDModel:
         self.count = self.count + 1
         return self.count
     
-    def get_reward(self, e_t, prev_e_t, alpha1=1, alpha2=1, epsilon=0.5):
-        if np.abs(e_t) < epsilon:
-            r1 = 0
+    def get_reward(self, e_t, prev_e_t, de_t):
+        alpha1 = 1
+        alpha2 = 1
+        r1 = np.exp(-np.abs(e_t-prev_e_t))
+
+        if de_t >= 0:
+            r2 = 1 - np.tanh(de_t)
         else:
-            r1 = epsilon - np.abs(e_t)
-        
-        if np.abs(e_t) <= np.abs(prev_e_t):
-            r2 = 0
-        else:
-            r2 = np.abs(e_t)-np.abs(prev_e_t)
+            r2 = np.tanh(de_t)
+
         r = alpha1*r1 + alpha2*r2
         return r
 
@@ -144,7 +144,7 @@ class PIDModel:
         #Updating PIDs setpoint for next time-step also updating count for next time-step
         self.pid.set_set_point(self.setpoint[self.get_next_count()])
         
-        reward = self.get_reward(e_t, prev_e_t)
+        reward = self.get_reward(e_t, prev_e_t, de_t)
         new_state = kd_, kp_, alpha, e_t, de_t
         
         if (self.count + 1) == len(self.t):
