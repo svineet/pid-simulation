@@ -7,6 +7,11 @@ import torch
 from torch import nn
 from torch.nn import functional as F
 
+from collections import namedtuple
+
+
+Transition = namedtuple("Transition", ["reward", "state", "next_state", "action", "target_action"])
+
 
 class Actor(nn.Module):
     def __init__(self, h1=50, h2=50, num_actions=3, state_size=5):
@@ -19,9 +24,9 @@ class Actor(nn.Module):
     def forward(self, state):
         out = F.relu(self.fc1(state))
         out = F.relu(self.fc2(out))
-        out = torch.sigmoid(self.fc3(out))
+        out = torch.tanh(self.fc3(out))
 
-        return out*torch.Tensor([1, 1, 3]) + torch.Tensor([0, 0, 2])
+        return out
 
 
 class Critic(nn.Module):
@@ -65,16 +70,10 @@ class Agent:
         return output
 
     def start_episode(self):
-        self.states = deque([])
-        self.rewards = deque([])
-        self.actions = deque([])
-        self.sug_actions = deque([])
+        self.transitions = deque([])
 
-    def step(self, state, action, suggested_action, reward):
-        self.states.append(state)
-        self.rewards.append(reward)
-        self.actions.append(action)
-        self.sug_actions.append(suggested_action)
+    def step(self, trans):
+        self.transitions.append(trans)
 
     def learn(self):
         """
@@ -87,42 +86,34 @@ class Agent:
             Episode chain is a list of (state, action, next_state, reward) tuples
             stored by Agent itself.
         """
-        cum_rew = 0
-        full_rew = 0
-        rewards = np.array(self.rewards)
-        discounted_rewards = deque([])
-        for reward in reversed(rewards):
-            full_rew += reward
-            cum_rew = reward + self.gamma*cum_rew
-            discounted_rewards.appendleft(cum_rew)
-
         device = self.device
-        discounted_rewards = torch.Tensor(discounted_rewards).to(device=device)
 
-
-        # Calculate real Monte Carlo value function for each state now
-        states = list(self.states)
+        batch = Transition(*zip(*self.transitions))
+        states = torch.cat(batch.state)
+        next_states = torch.cat(batch.next_state)
 
         # Value of the last state = R_t
         state_values = deque([])
         critic_loss = deque([])
-        del_ts = deque([(rewards[-1]-self.critic_model(torch.Tensor(states[-1]))).detach().numpy()[0]])
+        del_ts = deque([(rewards[-1]-self.critic_model(torch.Tensor(states[-1])))])
+        loss = torch.Tensor([0])
+        for trans in self.transitions:
+            next_value = self.critic_model(
+                    torch.Tensor(trans.next_state)) if trans.next_state is not None else
+            cur_value = self.critic_model(torch.Tensor(trans.state))
 
-        for reward, cur_state, next_state in zip(reversed(rewards[:-1]), reversed(states[:-1]), reversed(states[1:])):
-            next_value = self.critic_model(torch.Tensor(next_state))
-            cur_value = self.critic_model(torch.Tensor(cur_state))
+            reward = trans.reward
             delta_t = reward + self.gamma*next_value - cur_value
 
             del_ts.appendleft(delta_t)
             state_values.appendleft(cur_value)
 
-            self.critic_optimizer.zero_grad()
-
             # Critic loss
-            loss = delta_t**2 # Minimise delta_t**2
-            loss.backward()
+            loss += delta_t**2 # Minimise delta_t**2
 
-            self.critic_optimizer.step()
+        self.critic_optimizer.zero_grad()
+        loss.backward()
+        self.critic_optimizer.step()
 
         k = 0
         total_loss = torch.Tensor([0])
@@ -130,6 +121,9 @@ class Agent:
             k += 1
             if del_t > 0:
                 self.actor_optimizer.zero_grad()
+
+                if type(a_t) != torch.Tensor:
+                    import pdb; pdb.set_trace()
 
                 # Actor loss
                 loss = (a_t - ac_t)**2 # Push towards a_t
