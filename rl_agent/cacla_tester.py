@@ -18,8 +18,10 @@ def train(args):
 
     actor = Actor(state_size=8, num_actions=2)
     critic = Critic(state_size=8)
-    agent = Agent(env, lr=args["LEARNING_RATE"], actor_model=actor, critic_model=critic,
-                  device=args["DEVICE"], gamma=args["GAMMA"])
+    agent = Agent(env,
+        actor_lr=args["ACTOR_LEARNING_RATE"], critic_lr=args["CRITIC_LEARNING_RATE"],
+        actor_model=actor, critic_model=critic,
+        device=args["DEVICE"], gamma=args["GAMMA"])
 
     stats = {
         "episode_reward": deque([])
@@ -79,15 +81,17 @@ def train(args):
 if __name__ == '__main__':
     torch.autograd.set_detect_anomaly(True)
     stats = train({
-        "NUM_EPISODES": 100,
-        "LEARNING_RATE": 0.1,
+        "NUM_EPISODES": 750,
         "DEVICE": "cpu",
-        "exploration_stddev": 0.2,
-        "LOAD_PREVIOUS": False,
+        "exploration_stddev": 0.1,
+        "LOAD_PREVIOUS": True,
         "PRINT_EVERY": 50,
-        "GAMMA": 0.95
+        "GAMMA": 0.95,
+        "CRITIC_LEARNING_RATE": 0.01,
+        "ACTOR_LEARNING_RATE": 0.01
     })
 
+    import pdb; pdb.set_trace()
     plt.plot(stats["episode_reward"])
     plt.show()
 

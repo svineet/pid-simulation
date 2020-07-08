@@ -47,17 +47,18 @@ class Critic(nn.Module):
 
 class Agent:
     def __init__(self, environment, actor_model, critic_model,
-                 lr=0.01, gamma=0.9, device="cpu"):
+                 critic_lr=0.01, actor_lr=0.01, gamma=0.9, device="cpu"):
         self.actor_model = actor_model
         self.critic_model = critic_model
 
-        self.lr = lr
+        self.actor_lr = actor_lr
+        self.critic_lr = critic_lr
         self.gamma = gamma
         self.device = device
 
         # Train pure SGD
-        self.actor_optimizer = torch.optim.SGD(self.actor_model.parameters(), lr=lr)
-        self.critic_optimizer = torch.optim.SGD(self.critic_model.parameters(), lr=lr)
+        self.actor_optimizer = torch.optim.SGD(self.actor_model.parameters(), lr=actor_lr)
+        self.critic_optimizer = torch.optim.SGD(self.critic_model.parameters(), lr=critic_lr)
 
     def get_action(self, state):
         """
@@ -75,63 +76,67 @@ class Agent:
     def step(self, trans):
         self.transitions.append(trans)
 
+        # Learn for critic from this transition
+        next_value = self.critic_model(
+                torch.Tensor(trans.next_state)) if trans.next_state is not None else torch.Tensor([0])
+        cur_value = self.critic_model(torch.Tensor(trans.state))
+
+        reward = trans.reward
+        delta_t = reward + self.gamma*next_value - cur_value
+
+        self.critic_model.zero_grad()
+        cur_value.sum().backward()
+        for param in self.actor_model.parameters():
+            if param.grad is None: continue
+            grad = param.grad.data
+
+            param = param + self.critic_lr*delta_t.sum()*grad
+
     def learn(self):
-        """
-            Learn from stored episode data till now
-
-            1. TD learning for Value network
-            2. Custom update rule from CACLA for del > 0
-            del = advantage = (actual value of state - predicted_value)
-
-            Episode chain is a list of (state, action, next_state, reward) tuples
-            stored by Agent itself.
-        """
-        device = self.device
-
         batch = Transition(*zip(*self.transitions))
         # states = torch.cat(batch.state)
         # next_states = torch.cat(batch.next_state)
 
         # Value of the last state = R_t
         state_values = deque([])
-        critic_loss = deque([])
         del_ts = deque([])
         loss = torch.Tensor([0])
-        for trans in self.transitions:
-            next_value = self.critic_model(
-                    torch.Tensor(trans.next_state)) if trans.next_state is not None else torch.Tensor([0])
-            cur_value = self.critic_model(torch.Tensor(trans.state))
+        """
+            for trans in self.transitions:
+                next_value = self.critic_model(
+                        torch.Tensor(trans.next_state)) if trans.next_state is not None else torch.Tensor([0])
+                cur_value = self.critic_model(torch.Tensor(trans.state))
 
-            reward = trans.reward
-            delta_t = reward + self.gamma*next_value - cur_value
+                reward = trans.reward
+                delta_t = reward + self.gamma*next_value - cur_value
 
-            del_ts.appendleft(delta_t)
-            state_values.appendleft(cur_value)
+                del_ts.appendleft(delta_t)
+                state_values.appendleft(cur_value)
 
-            # Critic loss
-            loss += delta_t**2 # Minimise delta_t**2
+                # Critic loss
+                loss += delta_t**2 # Minimise delta_t**2
 
-        self.critic_optimizer.zero_grad()
-        loss.backward()
-        self.critic_optimizer.step()
+            self.critic_optimizer.zero_grad()
+            loss.backward()
+            self.critic_optimizer.step()
+        """
 
         k = 0
-        total_loss = torch.Tensor([0])
         for del_t, a_t, ac_t in zip(del_ts, batch.target_action, batch.action):
             k += 1
             if del_t > 0:
-                self.actor_optimizer.zero_grad()
+                assert (type(a_t) == torch.Tensor)
 
-                if type(a_t) != torch.Tensor:
-                    import pdb; pdb.set_trace()
+                self.actor_model.zero_grad()
 
-                # Actor loss
-                loss = del_t.detach()*(a_t - ac_t) # Push towards a_t
-                total_loss += loss.sum()
+                # Taken action: a_t
+                # Suggested action by actor is ac_t
+                ac_t.sum().backward()
+                for param in self.actor_model.parameters():
+                    if param.grad is None: continue
+                    grad = param.grad.data
 
-        if total_loss != 0:
-            total_loss.backward()
-        self.actor_optimizer.step()
+                    param = param + self.actor_lr*(a_t-ac_t).sum()*grad
 
     def load(self):
         self.actor_model.load_state_dict(
