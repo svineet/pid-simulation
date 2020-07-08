@@ -89,17 +89,17 @@ class Agent:
         device = self.device
 
         batch = Transition(*zip(*self.transitions))
-        states = torch.cat(batch.state)
-        next_states = torch.cat(batch.next_state)
+        # states = torch.cat(batch.state)
+        # next_states = torch.cat(batch.next_state)
 
         # Value of the last state = R_t
         state_values = deque([])
         critic_loss = deque([])
-        del_ts = deque([(rewards[-1]-self.critic_model(torch.Tensor(states[-1])))])
+        del_ts = deque([])
         loss = torch.Tensor([0])
         for trans in self.transitions:
             next_value = self.critic_model(
-                    torch.Tensor(trans.next_state)) if trans.next_state is not None else
+                    torch.Tensor(trans.next_state)) if trans.next_state is not None else torch.Tensor([0])
             cur_value = self.critic_model(torch.Tensor(trans.state))
 
             reward = trans.reward
@@ -117,7 +117,7 @@ class Agent:
 
         k = 0
         total_loss = torch.Tensor([0])
-        for del_t, a_t, ac_t in zip(reversed(del_ts), reversed(self.actions), reversed(self.sug_actions)):
+        for del_t, a_t, ac_t in zip(del_ts, batch.target_action, batch.action):
             k += 1
             if del_t > 0:
                 self.actor_optimizer.zero_grad()
@@ -126,10 +126,11 @@ class Agent:
                     import pdb; pdb.set_trace()
 
                 # Actor loss
-                loss = (a_t - ac_t)**2 # Push towards a_t
+                loss = del_t.detach()*(a_t - ac_t) # Push towards a_t
                 total_loss += loss.sum()
 
-        total_loss.backward()
+        if total_loss != 0:
+            total_loss.backward()
         self.actor_optimizer.step()
 
     def load(self):

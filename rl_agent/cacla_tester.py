@@ -69,7 +69,7 @@ def train(args):
 
         if i%1==0:
             agent.save()
-            stats["episode_reward"].append(total)
+            stats["episode_reward"].append(total/num_step) # average reward
             print("Reward for episode was", total)
 
 
@@ -82,7 +82,7 @@ if __name__ == '__main__':
         "NUM_EPISODES": 100,
         "LEARNING_RATE": 0.1,
         "DEVICE": "cpu",
-        "exploration_stddev": 0.1,
+        "exploration_stddev": 0.2,
         "LOAD_PREVIOUS": False,
         "PRINT_EVERY": 50,
         "GAMMA": 0.95
