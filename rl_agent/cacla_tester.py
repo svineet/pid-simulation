@@ -84,7 +84,7 @@ if __name__ == '__main__':
         "NUM_EPISODES": 750,
         "DEVICE": "cpu",
         "exploration_stddev": 0.1,
-        "LOAD_PREVIOUS": True,
+        "LOAD_PREVIOUS": False,
         "PRINT_EVERY": 50,
         "GAMMA": 0.95,
         "CRITIC_LEARNING_RATE": 0.01,

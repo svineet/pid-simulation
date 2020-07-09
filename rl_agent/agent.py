@@ -72,6 +72,7 @@ class Agent:
 
     def start_episode(self):
         self.transitions = deque([])
+        self.del_ts = deque([])
 
     def step(self, trans):
         self.transitions.append(trans)
@@ -83,60 +84,30 @@ class Agent:
 
         reward = trans.reward
         delta_t = reward + self.gamma*next_value - cur_value
+        self.del_ts.append(delta_t)
 
-        self.critic_model.zero_grad()
-        cur_value.sum().backward()
-        for param in self.actor_model.parameters():
-            if param.grad is None: continue
-            grad = param.grad.data
-
-            param = param + self.critic_lr*delta_t.sum()*grad
+        # Minimise delta_t, i.e push critic towards actual intended value
+        self.critic_optimizer.zero_grad()
+        loss = 0.5*(delta_t**2)
+        loss.backward()
+        self.critic_optimizer.step()
 
     def learn(self):
         batch = Transition(*zip(*self.transitions))
-        # states = torch.cat(batch.state)
-        # next_states = torch.cat(batch.next_state)
 
-        # Value of the last state = R_t
-        state_values = deque([])
-        del_ts = deque([])
-        loss = torch.Tensor([0])
-        """
-            for trans in self.transitions:
-                next_value = self.critic_model(
-                        torch.Tensor(trans.next_state)) if trans.next_state is not None else torch.Tensor([0])
-                cur_value = self.critic_model(torch.Tensor(trans.state))
+        del_ts = torch.Tensor(self.del_ts)
+        a_t = torch.stack(batch.target_action)
+        ac_t = torch.stack(batch.action)
+        surprise = ((a_t - ac_t)**2).sum(dim=1)
 
-                reward = trans.reward
-                delta_t = reward + self.gamma*next_value - cur_value
+        mask = (del_ts > 0)
+        # Minimise (a_t - ac_t)**2 for all t where del_t > 0
+        # i.e push Actor to generate a_t when it generated ac_t
+        loss = surprise[mask].sum()
 
-                del_ts.appendleft(delta_t)
-                state_values.appendleft(cur_value)
-
-                # Critic loss
-                loss += delta_t**2 # Minimise delta_t**2
-
-            self.critic_optimizer.zero_grad()
-            loss.backward()
-            self.critic_optimizer.step()
-        """
-
-        k = 0
-        for del_t, a_t, ac_t in zip(del_ts, batch.target_action, batch.action):
-            k += 1
-            if del_t > 0:
-                assert (type(a_t) == torch.Tensor)
-
-                self.actor_model.zero_grad()
-
-                # Taken action: a_t
-                # Suggested action by actor is ac_t
-                ac_t.sum().backward()
-                for param in self.actor_model.parameters():
-                    if param.grad is None: continue
-                    grad = param.grad.data
-
-                    param = param + self.actor_lr*(a_t-ac_t).sum()*grad
+        self.actor_optimizer.zero_grad()
+        loss.backward()
+        self.actor_optimizer.step()
 
     def load(self):
         self.actor_model.load_state_dict(
