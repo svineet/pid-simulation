@@ -15,7 +15,7 @@ def train(args):
     T_SIZE = 500
     SET_POINT = 50
 
-    t = np.linspace(0, 100, num=T_SIZE)
+    t = np.linspace(0, 50, num=T_SIZE)
     SP = np.ones(T_SIZE)*SET_POINT
 
     env = PIDModel(ku=1.396, tu=3.28, t=t, SP=SP)
@@ -79,10 +79,7 @@ def train(args):
         if i%1==0:
             agent.save()
             stats["episode_reward"].append(total/num_step)
-
-            transitions, del_ts = agent.get_episode_stats()
-            stats["del_ts"].extend(del_ts)
-
+            _, stats["del_ts"] = agent.get_episode_stats()
             print("Reward is ", total, "and average reward is", total/num_step)
 
     return stats
@@ -97,8 +94,8 @@ if __name__ == '__main__':
         "LOAD_PREVIOUS": False,
         "PRINT_EVERY": 50,
         "GAMMA": 0.95,
-        "CRITIC_LEARNING_RATE": 1e-2,
-        "ACTOR_LEARNING_RATE": 1e-3
+        "CRITIC_LEARNING_RATE": 1e-1,
+        "ACTOR_LEARNING_RATE": 5e-2
     })
 
     plt.plot(stats["episode_reward"])
