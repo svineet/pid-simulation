@@ -13,6 +13,28 @@ from collections import namedtuple
 Transition = namedtuple("Transition", ["reward", "state", "next_state", "action", "target_action"])
 
 
+class LunarLanderActor(nn.Module):
+    def __init__(self, h1=50, h2=50, num_actions=3, state_size=5):
+        super().__init__()
+
+        self.fc1 = nn.Linear(state_size, h1)
+        self.fc2 = nn.Linear(h1, h2)
+        self.fc3 = nn.Linear(h2, num_actions)
+        self.initialise_weights()
+
+    def initialise_weights(self):
+        nn.init.xavier_uniform_(self.fc1.weight)
+        nn.init.xavier_uniform_(self.fc2.weight)
+        nn.init.xavier_uniform_(self.fc3.weight)
+
+    def forward(self, state):
+        out = F.relu(self.fc1(state))
+        out = F.relu(self.fc2(out))
+        out = torch.tanh(self.fc3(out))
+
+        return out
+
+
 class Actor(nn.Module):
     def __init__(self, h1=50, h2=50, num_actions=3, state_size=5):
         super().__init__()
@@ -21,12 +43,25 @@ class Actor(nn.Module):
         self.fc2 = nn.Linear(h1, h2)
         self.fc3 = nn.Linear(h2, num_actions)
 
+        self.initialise_weights()
+
+    def initialise_weights(self):
+        nn.init.xavier_uniform_(self.fc1.weight)
+        nn.init.xavier_uniform_(self.fc2.weight)
+        nn.init.xavier_uniform_(self.fc3.weight)
+
     def forward(self, state):
         out = F.relu(self.fc1(state))
         out = F.relu(self.fc2(out))
-        out = torch.tanh(self.fc3(out))
+        out = torch.sigmoid(self.fc3(out))
 
-        return out
+        # Move ([0, 1], [0, 1], [0, 1]) to ([0, 1], [0, 1], [2, 5])
+        return out*torch.Tensor([1, 1, 3]) + torch.Tensor([0, 0, 2])
+
+    def clamp_action(self, action):
+        return torch.cat([
+            torch.clamp(action[:2], min=0, max=1),
+            torch.clamp(action[2:], min=2, max=5)])
 
 
 class Critic(nn.Module):
@@ -40,7 +75,7 @@ class Critic(nn.Module):
     def forward(self, state):
         out = F.relu(self.fc1(state))
         out = F.relu(self.fc2(out))
-        out = torch.sigmoid(self.fc3(out))
+        out = self.fc3(out)
 
         return out
 
@@ -57,8 +92,8 @@ class Agent:
         self.device = device
 
         # Train pure SGD
-        self.actor_optimizer = torch.optim.SGD(self.actor_model.parameters(), lr=actor_lr)
-        self.critic_optimizer = torch.optim.SGD(self.critic_model.parameters(), lr=critic_lr)
+        self.actor_optimizer = torch.optim.Adam(self.actor_model.parameters(), lr=actor_lr)
+        self.critic_optimizer = torch.optim.Adam(self.critic_model.parameters(), lr=critic_lr)
 
     def get_action(self, state):
         """
@@ -108,6 +143,9 @@ class Agent:
         self.actor_optimizer.zero_grad()
         loss.backward()
         self.actor_optimizer.step()
+
+    def get_episode_stats(self):
+        return (self.transitions, self.del_ts)
 
     def load(self):
         self.actor_model.load_state_dict(

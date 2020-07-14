@@ -8,7 +8,7 @@ from matplotlib import pyplot as plt
 from collections import deque
 
 from pid import PIDModel
-from agent import Agent, Actor, Critic, Transition
+from agent import Agent, LunarLanderActor, Critic, Transition
 
 import gym
 
@@ -16,7 +16,7 @@ import gym
 def train(args):
     env = gym.make("LunarLanderContinuous-v2")
 
-    actor = Actor(state_size=8, num_actions=2)
+    actor = LunarLanderActor(state_size=8, num_actions=2)
     critic = Critic(state_size=8)
     agent = Agent(env,
         actor_lr=args["ACTOR_LEARNING_RATE"], critic_lr=args["CRITIC_LEARNING_RATE"],
@@ -71,8 +71,12 @@ def train(args):
 
         if i%1==0:
             agent.save()
-            stats["episode_reward"].append(total/num_step) # average reward
-            print("Reward for episode was", total)
+            stats["episode_reward"].append(total/num_step)
+
+            transitions, del_ts = agent.get_episode_stats()
+            stats["del_ts"].extend(del_ts)
+
+            print("Reward is ", total, "and average reward is", total/num_step)
 
 
     return stats
@@ -81,14 +85,14 @@ def train(args):
 if __name__ == '__main__':
     torch.autograd.set_detect_anomaly(True)
     stats = train({
-        "NUM_EPISODES": 750,
+        "NUM_EPISODES": 1000,
         "DEVICE": "cpu",
         "exploration_stddev": 0.1,
         "LOAD_PREVIOUS": False,
         "PRINT_EVERY": 50,
         "GAMMA": 0.95,
-        "CRITIC_LEARNING_RATE": 0.01,
-        "ACTOR_LEARNING_RATE": 0.01
+        "CRITIC_LEARNING_RATE": 1e-2,
+        "ACTOR_LEARNING_RATE": 1e-2
     })
 
     import pdb; pdb.set_trace()
