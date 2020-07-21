@@ -79,7 +79,8 @@ def train(args):
         if i%1==0:
             agent.save()
             stats["episode_reward"].append(total/num_step)
-            _, stats["del_ts"] = agent.get_episode_stats()
+            stats["del_ts"].extend(agent.get_episode_stats()[1])
+
             print("Reward is ", total, "and average reward is", total/num_step)
 
     return stats
@@ -88,21 +89,23 @@ def train(args):
 if __name__ == '__main__':
     torch.autograd.set_detect_anomaly(True)
     stats = train({
-        "NUM_EPISODES": 500,
+        "NUM_EPISODES": 100,
         "DEVICE": "cpu",
         "exploration_stddev": 0.1,
         "LOAD_PREVIOUS": False,
         "PRINT_EVERY": 50,
         "GAMMA": 0.95,
-        "CRITIC_LEARNING_RATE": 1e-1,
-        "ACTOR_LEARNING_RATE": 5e-2
+        "CRITIC_LEARNING_RATE": 1e-5,
+        "ACTOR_LEARNING_RATE": 1e-4
     })
+
 
     plt.plot(stats["episode_reward"])
     plt.savefig("average_reward_per_episode_graph.png")
     plt.show()
 
-    del_ts = stats["del_ts"]
+    del_ts = pd.Series(stats["del_ts"])
+    del_ts.to_csv("del_ts.csv")
     plt.plot(del_ts)
     plt.savefig("del_ts.png")
     plt.show()

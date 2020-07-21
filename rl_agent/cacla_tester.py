@@ -24,7 +24,8 @@ def train(args):
         device=args["DEVICE"], gamma=args["GAMMA"])
 
     stats = {
-        "episode_reward": deque([])
+        "episode_reward": deque([]),
+        "del_ts": deque([])
     }
 
     if args["LOAD_PREVIOUS"]:
@@ -39,12 +40,14 @@ def train(args):
         state = env.reset()
 
         num_step = 0; done = False
+        oup_noise = np.zeros(2)
         while not done:
             action = agent.get_action(state)
 
             # Exploration strategy
             gauss_noise = np.random.normal(0, args["exploration_stddev"], size=2)
-            target_action = torch.clamp(action+torch.Tensor(gauss_noise), min=-1, max=1)
+            oup_noise = gauss_noise + args["KAPPA"]*oup_noise
+            target_action = torch.clamp(action+torch.Tensor(oup_noise), min=-1, max=1)
 
             new_state, reward, done, info = env.step(target_action.detach().numpy())
             transition = Transition(
@@ -85,18 +88,23 @@ def train(args):
 if __name__ == '__main__':
     torch.autograd.set_detect_anomaly(True)
     stats = train({
-        "NUM_EPISODES": 1000,
+        "NUM_EPISODES": 100,
         "DEVICE": "cpu",
         "exploration_stddev": 0.1,
         "LOAD_PREVIOUS": False,
         "PRINT_EVERY": 50,
         "GAMMA": 0.95,
-        "CRITIC_LEARNING_RATE": 1e-2,
-        "ACTOR_LEARNING_RATE": 1e-2
+        "CRITIC_LEARNING_RATE": 1e-4,
+        "ACTOR_LEARNING_RATE": 1e-2,
+        "KAPPA": 0.6
     })
 
     import pdb; pdb.set_trace()
+
     plt.plot(stats["episode_reward"])
+    plt.show()
+
+    plt.plot(stats["del_ts"])
     plt.show()
 
 
