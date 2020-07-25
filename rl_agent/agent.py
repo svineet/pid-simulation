@@ -14,7 +14,7 @@ Transition = namedtuple("Transition", ["reward", "state", "next_state", "action"
 
 
 class LunarLanderActor(nn.Module):
-    def __init__(self, h1=50, h2=50, num_actions=3, state_size=5):
+    def __init__(self, h1=20, h2=20, num_actions=3, state_size=5):
         super().__init__()
 
         self.fc1 = nn.Linear(state_size, h1)
@@ -113,6 +113,7 @@ class Agent:
         self.transitions.append(trans)
 
         # Learn for critic from this transition
+        # Question: Should this be detached?
         next_value = self.critic_model(
                 torch.Tensor(trans.next_state)) if trans.next_state is not None else torch.Tensor([0])
         cur_value = self.critic_model(torch.Tensor(trans.state))
@@ -131,7 +132,7 @@ class Agent:
         batch = Transition(*zip(*self.transitions))
 
         del_ts = torch.Tensor(self.del_ts)
-        a_t = torch.stack(batch.target_action)
+        a_t = torch.stack(batch.target_action).detach()
         ac_t = torch.stack(batch.action)
         surprise = ((a_t - ac_t)**2).sum(dim=1)
 

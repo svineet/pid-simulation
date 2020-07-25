@@ -10,14 +10,18 @@ from collections import deque
 from pid import PIDModel
 from agent import Agent, LunarLanderActor, Critic, Transition
 
+from continuous_cartpole import ContinuousCartPoleEnv
+
 import gym
 
 
 def train(args):
-    env = gym.make("LunarLanderContinuous-v2")
+    env = ContinuousCartPoleEnv()
+    STATE_SIZE = 4
+    ACTION_SPACE_SIZE = 1
 
-    actor = LunarLanderActor(state_size=8, num_actions=2)
-    critic = Critic(state_size=8)
+    actor = LunarLanderActor(state_size=STATE_SIZE, num_actions=ACTION_SPACE_SIZE)
+    critic = Critic(state_size=STATE_SIZE)
     agent = Agent(env,
         actor_lr=args["ACTOR_LEARNING_RATE"], critic_lr=args["CRITIC_LEARNING_RATE"],
         actor_model=actor, critic_model=critic,
@@ -40,12 +44,12 @@ def train(args):
         state = env.reset()
 
         num_step = 0; done = False
-        oup_noise = np.zeros(2)
+        oup_noise = np.zeros(ACTION_SPACE_SIZE)
         while not done:
             action = agent.get_action(state)
 
             # Exploration strategy
-            gauss_noise = np.random.normal(0, args["exploration_stddev"], size=2)
+            gauss_noise = np.random.normal(0, args["exploration_stddev"], size=ACTION_SPACE_SIZE)
             oup_noise = gauss_noise + args["KAPPA"]*oup_noise
             target_action = torch.clamp(action+torch.Tensor(oup_noise), min=-1, max=1)
 
@@ -72,9 +76,12 @@ def train(args):
         # Learn from this episode
         agent.learn()
 
+        if args["RENDER_ENV"]:
+            env.render()
+
         if i%1==0:
             agent.save()
-            stats["episode_reward"].append(total/num_step)
+            stats["episode_reward"].append(total)
 
             transitions, del_ts = agent.get_episode_stats()
             stats["del_ts"].extend(del_ts)
@@ -90,20 +97,17 @@ if __name__ == '__main__':
     stats = train({
         "NUM_EPISODES": 100,
         "DEVICE": "cpu",
-        "exploration_stddev": 0.1,
+        "exploration_stddev": 0.2,
         "LOAD_PREVIOUS": False,
-        "PRINT_EVERY": 50,
+        "PRINT_EVERY": 10,
         "GAMMA": 0.95,
-        "CRITIC_LEARNING_RATE": 1e-4,
-        "ACTOR_LEARNING_RATE": 1e-2,
-        "KAPPA": 0.6
+        "CRITIC_LEARNING_RATE": 1e-3,
+        "ACTOR_LEARNING_RATE": 1e-3,
+        "KAPPA": 0.7,
+        "RENDER_ENV": False
     })
 
-    import pdb; pdb.set_trace()
-
     plt.plot(stats["episode_reward"])
-    plt.show()
-
     plt.plot(stats["del_ts"])
     plt.show()
 
