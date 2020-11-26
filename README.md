@@ -1,7 +1,7 @@
 PID Simulation and RL Agent Design
 ===
 
-Aim: Create a PID simulation with dynamic parameter changes
+Aim: Create a PID simulation with dynamic parameter changes  
 Aim: Implement reinforcement learning agent to operate on the same.
 
 Installation
